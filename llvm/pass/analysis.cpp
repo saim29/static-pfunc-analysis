@@ -223,7 +223,7 @@ bool lkp_analysis::backTrackRet(Instruction *ret) {
 
     BasicBlock *b = ret->getParent();
 
-    //backtrack from return instruction until the end of the basic block to ensure that mpt_end lies in the same execution path
+    //backtrack from return instruction until the end of the basic block to ensure that mpt_end lies in the same execution pathl
     for (BasicBlock::iterator s = BasicBlock::iterator(ret), e = b->begin(); s != e; s--) {
 
         if (is_mpt_begin(&*s)) {
