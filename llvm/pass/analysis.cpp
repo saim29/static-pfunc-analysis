@@ -34,9 +34,6 @@ bool lkp_analysis::runOnModule(Module &M) {
     }
 
     for(auto func: workList) {
-
-        // errs() << "jere\n";
-        // errs() << func->getName() << "\n";
         analyzeUntrusted(*func);
     }
 }
@@ -157,28 +154,11 @@ void lkp_analysis::analyzeTrusted(Function &F) {
 
             if (isa<ReturnInst>(&I)) {
 
-                BasicBlock *retBlock = (I.getParent());
-                bool endFound = false;
-                for (Instruction &retI : *retBlock) {
+                if (!backTrackRet(&I)) {
 
-                    if (!is_mpt_end(&retI)) {
-                        
-                        continue;
-
-                    } else {
-
-                        endFound = true;
-                        break;
-                    }
+                    errs() << "ERROR: MPT_END EXPECTED AT THE END OF A FUNCTION\n";
                 }
-
-                if (!endFound) {
-
-                    //abort Program
-                    unsigned line = getSourceLocation(&I);
-                    errs() << "ERROR: mpt_end required before line " << line << " in function " << F.getName() << "\n";
-                }
-            } 
+            }
         }
     }
 }
@@ -237,6 +217,26 @@ unsigned lkp_analysis::getSourceLocation(Instruction *I) {
     }
 
     return line;
+}
+
+bool lkp_analysis::backTrackRet(Instruction *ret) {
+
+    BasicBlock *b = ret->getParent();
+
+    //backtrack from return instruction until the end of the basic block to ensure that mpt_end lies in the same execution path
+    for (BasicBlock::iterator s = BasicBlock::iterator(ret), e = b->begin(); s != e; s--) {
+
+        if (is_mpt_begin(&*s)) {
+
+            errs() << "LOG: mpt_begin called before ret instruction\n";
+            return false;
+
+        } else if (is_mpt_end(&*s)){
+
+            errs() << "LOG: mpt_end found before ret instruction\n";
+            return true;
+        }
+    }
 }
 
 char lkp_analysis::ID = 1;

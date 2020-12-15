@@ -21,13 +21,12 @@ CFLAGS = \
 
 all: $(OUT)
 
-$(app).bc: $(app).c 
+$(ex).bc: $(ex).c 
 	$(CLANG) -emit-llvm -c -O -Xclang -disable-llvm-passes -fheinous-gnu-extensions $(CFLAGS) $^
 
-$(app).ll: $(app).bc
+$(ex).ll: $(ex).bc
 	$(DIS) $^
-	make -C ../build
-	$(OPT) -load ../build/pass/lkp.so --lkp_analysis -time-passes $@
+	$(OPT) -load ../bld/pass/lkp.so --lkp_analysis -time-passes $@
 
 clean:
 

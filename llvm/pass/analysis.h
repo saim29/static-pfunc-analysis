@@ -39,6 +39,7 @@ namespace {
 
         void analyzeTrusted(Function &F);
         void analyzeUntrusted(Function &F);
+        bool backTrackRet(Instruction *ret);
         bool is_mpt_begin(Instruction *I);
         bool is_mpt_end(Instruction *I);
         unsigned getSourceLocation(Instruction *I);
