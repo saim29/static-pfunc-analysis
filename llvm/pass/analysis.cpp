@@ -17,6 +17,7 @@ bool lkp_analysis::runOnModule(Module &M) {
 
         if (F.getName().contains("mpt_")) {
             
+            //skip mpt functions
             continue;
         }
         else if (F.getName().contains("private_")) {
@@ -44,6 +45,74 @@ bool lkp_analysis::doFinalization(Module &M) {
 
 }
 
+bool lkp_analysis::backtrackStore(Value* var, set<Value*>& stackFrameVars) {
+
+    // vector<Value*> stack;
+    // stack.push_back(var);
+
+    // while (!stack.empty()) {
+
+    //     Value *cur = stack.back();
+    //     stackFrameVars.insert(cur);
+    //     stack.pop_back();
+
+    //     for (auto u : cur->users()) {
+
+    //         stack.push_back(u);
+    //     }        
+    // }
+
+    // for (auto i = var->use_begin(), e = var->use_end(); i != e; ++i)
+    // if (Instruction *Inst = dyn_cast<Instruction>(*i)) {
+    //     errs() << "F is used in instruction:\n";
+    //     errs() << *Inst << "\n";
+    // }
+
+    //check if var is gepop or bitcastop or simple instruction/load
+
+    //enclose in while
+
+    Value *back = var;
+    while (back) {
+
+        //back->dump();
+        if (auto i = dyn_cast<GEPOperator>(back)) {
+
+            //do stuff with gep
+            back = i->getOperand(0);
+
+        } else if (auto i = dyn_cast<BitCastOperator>(back)) {
+
+            //do stuff with bitcast
+            back = i->getOperand(0);
+
+        } else if (auto i = dyn_cast<Instruction>(back)) {
+
+            if (auto i = dyn_cast<AllocaInst>(back)) {
+
+                //errs() << "here2\n";
+                back = i;
+                return false;
+
+            } 
+
+            //do stuff with inst
+            back = i->getOperand(0);
+
+        } else if (auto i = dyn_cast<GlobalValue>(back)){
+
+            //errs() << "here\n";
+            back = i;
+            return true;
+
+        } else {
+
+            //errs() << "here3\n";
+            return false;
+        }
+    }
+}
+
 void lkp_analysis::analyzeTrusted(Function &F) {
 
     //typedef SmallPtrSet<Value*, 32> localVars;
@@ -57,41 +126,13 @@ void lkp_analysis::analyzeTrusted(Function &F) {
     while(isa<AllocaInst>(f_start)) {
 
         //insert the localVariables in the stackFrame data structure
-        stackFrameVars.insert(f_start);
-
-        // only searches to depth 3. Better approach would be to do depth-first or breath-first
-        for(auto U : f_start->users()){  // U is of type User*
-            if (auto I = dyn_cast<Instruction>(U)){
-                
-                stackFrameVars.insert(dyn_cast<Value>(I));
-                //I->dump();
-                for(auto U1 : I->users()){
-
-                    if (auto I1 = dyn_cast<Instruction>(U1)) {
-                        stackFrameVars.insert(dyn_cast<Value>(I1));
-
-                        //I1->dump();
-
-                        for(auto U2 : I1->users()){
-
-                            if (auto I2 = dyn_cast<Instruction>(U2)) {
-                                    stackFrameVars.insert(dyn_cast<Value>(I2));
-
-                                    //I2->dump();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
+        //getLocalVarAccesses(f_start, stackFrameVars);
         f_start = f_start->getNextNode();
+
     }
 
     //the instruction right after should be mpt_begin
-
     bool found = false;
-
     BasicBlock *first = &F.front();
     for (Instruction &I: *first) {
 
@@ -119,10 +160,7 @@ void lkp_analysis::analyzeTrusted(Function &F) {
 
                 Value *to = l->getOperand(1);
 
-                if (stackFrameVars.find(to) == stackFrameVars.end()) {
-
-                    // I.dump();
-                    // l->getOperand(1)->dump();
+                if (backtrackStore(to, stackFrameVars)) {
 
                     unsigned line = getSourceLocation(l);
                     errs() << "WARNING: data is being copied to non-local memory at " << line << " in function " << F.getName() << "\n";
@@ -136,11 +174,10 @@ void lkp_analysis::analyzeTrusted(Function &F) {
 
                     Value *argTo = l->getArgOperand(0);
 
-                    if (stackFrameVars.find(argTo) == stackFrameVars.end()) {
+                    if (backtrackStore(argTo, stackFrameVars)) {
 
                         unsigned line = getSourceLocation(l);
                         errs() << "WARNING: data is being copied to non-local memory at " << line << " in function " << F.getName() << "\n";
-
                     }
                 }
             }
@@ -154,7 +191,7 @@ void lkp_analysis::analyzeTrusted(Function &F) {
 
             if (isa<ReturnInst>(&I)) {
 
-                if (!backTrackRet(&I)) {
+                if (!backtrackRet(&I)) {
 
                     errs() << "ERROR: MPT_END EXPECTED AT THE END OF A FUNCTION\n";
                 }
@@ -219,7 +256,7 @@ unsigned lkp_analysis::getSourceLocation(Instruction *I) {
     return line;
 }
 
-bool lkp_analysis::backTrackRet(Instruction *ret) {
+bool lkp_analysis::backtrackRet(Instruction *ret) {
 
     BasicBlock *b = ret->getParent();
 

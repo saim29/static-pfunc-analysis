@@ -33,7 +33,7 @@
 
 int vpkeys[DOMAIN];
 
-char global;
+char global[2];
 // private functions to manipulate domains
 
 
@@ -70,7 +70,7 @@ static void private_func2(char** addr) {
         addr[0][i] = 'a';
     }
 
-    global = addr[0][0];
+    addr[0][0] = global[0];
     EXIT_DOMAIN(vpkeys[0]);
 }
 
@@ -85,7 +85,8 @@ static void private_func3(char** addr) {
     }
 
     a = 1;
-    addr[0][a] = global;
+    addr[0][a] = global[a];
+    //global[0] = addr[0][0];
     EXIT_DOMAIN(vpkeys[1]);
     
 }
